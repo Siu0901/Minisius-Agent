@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+.idea/
+.DS_Store
+
+# 비밀 값
+.env
+.env.*
+secrets.toml
+
+# Claude Code 개인 설정
+.claude/settings.local.json

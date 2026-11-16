@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./scripts/init.sh)",
+      "Bash(./scripts/verify.sh)",
+      "Bash(uv sync)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run mypy:*)",
+      "Bash(uv run python scripts/check_architecture.py:*)",
+      "Bash(uv run python scripts/check_features.py:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets.toml)",
+      "Read(~/.minisius/secrets.toml)"
+    ]
+  }
+}
