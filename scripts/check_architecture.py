@@ -9,7 +9,7 @@ docs/ARCHITECTURE.md 의 "의존 규칙" 표를 코드로 강제한다.
 
 기본 경로는 src/minisius 이다. 위반이 있으면 종료 코드 1.
 
-한계: import 문과 일부 속성 호출만 본다. 내장 open() 같은 직접 파일 접근은
+한계: import 문, 일부 속성 호출, 예외 클래스 정의만 본다. 내장 open() 같은 직접 파일 접근은
 잡지 못하므로 리뷰(architecture-reviewer)로 보완한다.
 """
 
@@ -101,6 +101,17 @@ RULES: tuple[Rule, ...] = (
     ),
 )
 
+# A7 은 import 가 아니라 클래스 정의를 본다. RULES 의 반복에는 들어가지 않는다.
+ERRORS_MODULE = f"{PACKAGE}.errors"
+EXCEPTION_SUFFIXES = ("Error", "Exception", "Warning")
+RULE_A7 = Rule(
+    id="A7",
+    reason="예외 클래스는 errors.py 에만 둔다",
+    sources=(PACKAGE,),
+    forbidden=(),
+    except_sources=(ERRORS_MODULE,),
+)
+
 
 @dataclass(frozen=True)
 class Violation:
@@ -151,7 +162,38 @@ def imported_targets(tree: ast.AST, module: str, is_package: bool) -> list[tuple
     return found
 
 
-def check_file(path: Path, root: Path) -> list[Violation]:
+def _base_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def project_exception_names(root: Path) -> frozenset[str]:
+    """errors.py 에 정의된 클래스 이름. 접미사로 알 수 없는 PermissionDenied 등을 잡는다."""
+    path = root / "errors.py"
+    if not path.is_file():
+        return frozenset()
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    return frozenset(node.name for node in ast.walk(tree) if isinstance(node, ast.ClassDef))
+
+
+def exception_classes(tree: ast.AST, known: frozenset[str]) -> list[tuple[int, str]]:
+    """(줄 번호, 클래스 이름) 목록. 부모 이름이 예외처럼 보이는 클래스를 고른다."""
+    found: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        bases = [name for name in map(_base_name, node.bases) if name]
+        if any(name.endswith(EXCEPTION_SUFFIXES) or name in known for name in bases):
+            found.append((node.lineno, node.name))
+    return found
+
+
+def check_file(
+    path: Path, root: Path, known_exceptions: frozenset[str] = frozenset()
+) -> list[Violation]:
     module = module_name(path, root)
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     targets = imported_targets(tree, module, is_package=path.name == "__init__.py")
@@ -167,13 +209,17 @@ def check_file(path: Path, root: Path) -> list[Violation]:
         for line, attr in attrs:
             if attr in rule.forbidden_attrs:
                 violations.append(Violation(path, line, rule, attr))
+    if not _matches(module, RULE_A7.except_sources):
+        for line, name in exception_classes(tree, known_exceptions):
+            violations.append(Violation(path, line, RULE_A7, name))
     return violations
 
 
 def check_tree(root: Path) -> list[Violation]:
+    known = project_exception_names(root)
     violations: list[Violation] = []
     for path in sorted(root.rglob("*.py")):
-        violations.extend(check_file(path, root))
+        violations.extend(check_file(path, root, known))
     return sorted(violations, key=lambda v: (str(v.path), v.line))
 
 

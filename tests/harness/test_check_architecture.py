@@ -62,3 +62,24 @@ def test_framework_import_is_flagged(tmp_path: Path) -> None:
     root = tmp_path / "minisius"
     _write(root, "memory/store.py", "from langgraph.graph import StateGraph\n")
     assert _rule_ids(root) == ["A1"]
+
+
+def test_exception_class_outside_errors_module_is_flagged(tmp_path: Path) -> None:
+    root = tmp_path / "minisius"
+    _write(
+        root,
+        "errors.py",
+        "class MinisiusError(Exception): ...\nclass PermissionDenied(MinisiusError): ...\n",
+    )
+    _write(root, "tools/files.py", "class FileMissingError(Exception): ...\n")
+    _write(
+        root,
+        "tools/shell.py",
+        "from minisius import errors\nclass Blocked(errors.PermissionDenied): ...\n",
+    )
+    _write(root, "core/loop.py", "class Loop: ...\nclass Config(dict): ...\n")
+    violations = checker.check_tree(root)
+    assert [(v.rule.id, v.target) for v in violations] == [
+        ("A7", "FileMissingError"),
+        ("A7", "Blocked"),
+    ]

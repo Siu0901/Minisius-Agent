@@ -79,6 +79,7 @@ src/minisius/
 | A4 | `core` 는 `providers.base` 와 `providers.models` 만 import 한다. 특정 어댑터를 모른다 |
 | A5 | `tools` 는 프로세스를 직접 띄우지 않는다(`subprocess` 등 금지). `execution` 백엔드를 거친다 |
 | A6 | `tools` 는 `policy` 를 import 하지 않는다. 권한 판정은 Agent Loop 가 도구 실행 전에 `policy` 에 묻는다 |
+| A7 | 예외 클래스는 `errors.py` 에만 정의한다 |
 
 코드로 검사하지 못하는 규칙(리뷰로 확인):
 - 도구는 파일을 내장 `open()` 으로 직접 열지 않고 `execution` 백엔드를 거친다.

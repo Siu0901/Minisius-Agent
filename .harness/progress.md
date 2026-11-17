@@ -7,11 +7,12 @@
 
 ## Current Milestone
 
-M0 완료. 다음은 v0.1-alpha.
+v0.1-alpha (1/11 완료)
 
 ## Completed
 
-- M0-F01 개발 하네스: 문서 5개, 상태 파일, 검증 스크립트, Claude Code 규칙·스킬·에이전트
+- M0-F01 개발 하네스
+- V01A-F01 예외 계층 (`src/minisius/errors.py`). 아키텍처 검사기에 A7(예외 클래스는 errors.py 에만) 추가
 
 ## Current Work
 
@@ -19,7 +20,7 @@ M0 완료. 다음은 v0.1-alpha.
 
 ## Test Results
 
-- `./scripts/verify.sh`: PASS (2026-11-17)
+- `./scripts/verify.sh`: PASS (2026-11-17, 테스트 22개)
 
 ## Known Issues
 
@@ -27,7 +28,7 @@ M0 완료. 다음은 v0.1-alpha.
 
 ## Next Task
 
-`/implement-feature V01A-F01`(예외 계층)부터 `features.json` 순서대로 구현한다.
+`/implement-feature V01A-F02`(내부 표준 메시지 포맷, `core/messages.py`). 타입은 `docs/ARCHITECTURE.md` 5.1절에 확정돼 있다.
 
 v0.1 은 alpha 와 beta 로 나뉜다(ADR-019). alpha 는 Anthropic 어댑터와 읽기 전용 도구만으로
 Agent Loop 를 실제로 돌리는 데까지다. 쓰기·셸 도구는 권한 정책과 함께 beta 에 들어온다(ADR-018).

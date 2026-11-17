@@ -18,9 +18,11 @@
       "milestone": "v0.1-alpha",
       "name": "예외 계층 (errors.py)",
       "spec": "docs/ARCHITECTURE.md#6",
-      "status": "pending",
-      "passes": false,
-      "tests": []
+      "status": "completed",
+      "passes": true,
+      "tests": [
+        "tests/test_errors.py"
+      ]
     },
     {
       "id": "V01A-F02",
