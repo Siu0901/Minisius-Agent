@@ -40,9 +40,11 @@
       "milestone": "v0.1-alpha",
       "name": "설정과 경로 규칙 (config.py)",
       "spec": "docs/ARCHITECTURE.md#7",
-      "status": "pending",
-      "passes": false,
-      "tests": []
+      "status": "completed",
+      "passes": true,
+      "tests": [
+        "tests/test_config.py"
+      ]
     },
     {
       "id": "V01A-F04",
