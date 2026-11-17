@@ -93,7 +93,233 @@ src/minisius/
 
 ## 5. 핵심 인터페이스
 
-Message, Event, Tool, Provider, ExecutionBackend, Frontend 의 타입 정의: **미정** (v0.1 첫 작업)
+아래 타입이 계층 사이의 계약이다. 필드를 바꾸면 이 절을 먼저 고친다. 모두 Pydantic 모델이다.
+
+### 5.1 Message — `core/messages.py`
+
+```python
+class TextPart(BaseModel):
+    type: Literal["text"] = "text"
+    text: str
+
+
+class ToolCallPart(BaseModel):
+    type: Literal["tool_call"] = "tool_call"
+    id: str  # 어댑터가 항상 고유 값을 보장한다
+    name: str
+    arguments: dict[str, Any]
+    provider_data: dict[str, Any] | None = None  # 예: Gemini thought signature
+
+
+class ToolResultPart(BaseModel):
+    type: Literal["tool_result"] = "tool_result"
+    tool_call_id: str
+    content: str
+    is_error: bool = False
+
+
+class OpaquePart(BaseModel):  # 예: Anthropic thinking 블록
+    type: Literal["opaque"] = "opaque"
+    provider: str
+    data: dict[str, Any]
+
+
+Part = Annotated[TextPart | ToolCallPart | ToolResultPart | OpaquePart, Field(discriminator="type")]
+
+
+class Message(BaseModel):
+    role: Literal["user", "assistant", "tool"]
+    parts: list[Part]
+```
+
+- 시스템 프롬프트는 메시지가 아니라 `LLMRequest.system` 이다.
+- 도구 결과는 `role="tool"` 메시지로 통일한다. 프로바이더별 위치 차이는 어댑터가 처리한다.
+- 불투명 데이터(`OpaquePart`, `provider_data`)는 같은 프로바이더에게만 되돌려 보낸다. 세션 중간에 프로바이더가 바뀌면 버린다.
+- 이미지 입력은 없다. 필요해지면 `Part` 에 `ImagePart` 를 추가한다.
+
+### 5.2 Provider — `providers/base.py`
+
+```python
+class ToolSpec(BaseModel):
+    name: str
+    description: str
+    input_schema: dict[str, Any]  # JSON Schema
+
+
+class Usage(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+
+
+class StopReason(StrEnum):
+    END_TURN = "end_turn"
+    TOOL_USE = "tool_use"
+    MAX_TOKENS = "max_tokens"
+
+
+class LLMRequest(BaseModel):
+    model: str
+    system: str
+    messages: list[Message]
+    tools: list[ToolSpec]
+    max_tokens: int
+
+
+class LLMResponse(BaseModel):
+    message: Message  # role="assistant"
+    stop_reason: StopReason
+    usage: Usage
+
+
+class TextDelta(BaseModel):
+    text: str
+
+
+class Provider(Protocol):
+    name: str
+
+    def stream(self, request: LLMRequest) -> AsyncIterator[TextDelta | LLMResponse]: ...
+```
+
+- 추상 메서드는 `stream()` 하나다. `TextDelta` 를 내보내다가 마지막에 완성된 `LLMResponse` 를 정확히 한 번 내보낸다.
+- 도구 호출 인수는 조각으로 내보내지 않는다. 어댑터가 모아서 완성된 `ToolCallPart` 로 준다.
+- 어댑터는 SDK 예외를 `ProviderError` 계층으로 바꿔 던진다.
+
+`providers/models.py` 의 `ModelInfo`: `context_window`, `max_output_tokens`, `supports_tools`, 입력·출력 토큰 단가.
+표에 없는 모델(Ollama, OpenRouter 의 임의 모델)은 설정 파일에서 값을 받는다.
+
+### 5.3 Tool — `tools/base.py`
+
+```python
+class ActionKind(StrEnum):
+    READ = "read"
+    WRITE = "write"
+    DELETE = "delete"
+    EXECUTE = "execute"
+    NETWORK = "network"
+    EXTERNAL = "external"  # MCP 도구처럼 내용을 알 수 없는 것
+
+
+class Action(BaseModel):
+    kind: ActionKind
+    target: str  # 경로, 명령어, URL
+
+
+class ToolContext(BaseModel):
+    session_id: str
+    workdir: Path
+    backend: ExecutionBackend
+
+
+class ToolOutput(BaseModel):
+    content: str  # LLM 에 돌려줄 텍스트
+
+
+class Tool[ArgsT: BaseModel](ABC):
+    name: str
+    description: str
+    args_model: type[ArgsT]  # JSON Schema 생성과 인수 검증에 쓴다
+
+    @abstractmethod
+    def actions(self, args: ArgsT) -> list[Action]: ...
+    @abstractmethod
+    async def run(self, args: ArgsT, ctx: ToolContext) -> ToolOutput: ...
+```
+
+- `actions()` 는 아무것도 실행하지 않는다. 이 인수로 실행하면 무엇을 건드리는지 사실만 선언한다.
+- 허용·승인·차단은 `policy` 가 Action 만 보고 판정한다. `policy` 는 도구 이름과 인수 구조를 모른다.
+- 인수 검증 실패, `run()` 안의 예외, 너무 긴 출력의 잘라내기는 Registry 가 처리한다.
+
+### 5.4 도구 호출 한 번의 흐름
+
+LLM 은 도구를 호출하겠다고 응답하고 결과를 받을 뿐이다. 그 사이의 검사는 전부 Agent Loop 가 한다.
+
+1. LLM 응답에 `ToolCallPart` 가 있다.
+2. Agent Loop 가 Registry 로 인수를 검증한다. 실패하면 오류를 도구 결과로 돌려준다.
+3. Agent Loop 가 도구의 `actions(args)` 를 부른다.
+4. `tool_call_started` 이벤트를 기록한다.
+5. Agent Loop 가 Action 을 `policy` 에 넘긴다. 판정은 허용, 승인 필요, 차단 중 하나다(v0.2. v0.1 은 전부 허용).
+   승인 필요면 `Frontend.request_approval()` 로 사용자에게 묻는다.
+6. 허용 또는 승인이면 `run()` 을 부른다. 거절 또는 차단이면 `PermissionDenied` 를 도구 결과로 만든다.
+7. `tool_call_finished` 이벤트를 기록하고 결과를 LLM 에 돌려준다.
+
+### 5.5 ExecutionBackend — `execution/base.py`
+
+```python
+class ExecResult(BaseModel):
+    exit_code: int
+    stdout: str
+    stderr: str
+    timed_out: bool
+
+
+class ExecutionBackend(Protocol):
+    async def run(self, command: str, *, cwd: Path, timeout: float) -> ExecResult: ...
+    async def read_file(self, path: Path) -> bytes: ...
+    async def write_file(self, path: Path, data: bytes) -> None: ...
+    async def list_dir(self, path: Path) -> list[DirEntry]: ...
+    async def stat(self, path: Path) -> FileStat | None: ...
+    async def delete(self, path: Path) -> None: ...
+```
+
+- 명령이 0이 아닌 코드로 끝나는 것은 예외가 아니라 결과다.
+- 백엔드는 권한을 모른다. 가장 아래 계층이다.
+- `DirEntry`, `FileStat` 의 필드: 미정 (V01-F09 에서 정한다).
+
+### 5.6 Event — `core/events.py`
+
+```python
+class Event(BaseModel):
+    session_id: str
+    seq: int  # 세션 안에서 1부터 증가
+    ts: datetime
+    type: str
+    payload: dict[str, Any]  # type 별 Pydantic 모델로 검증한다
+```
+
+| 타입 | 내용 |
+|---|---|
+| `session_started` | 작업 폴더, 프로바이더, 모델, 인터페이스 |
+| `user_message` | 사용자 메시지 |
+| `llm_request` | 모델, 컨텍스트에 포함한 이벤트 범위 |
+| `llm_response` | 응답 메시지, 종료 이유, 토큰, 비용, 소요 시간 |
+| `tool_call_started` | 호출 ID, 도구 이름, 인수, 선언한 Action |
+| `tool_call_finished` | 호출 ID, 결과, 오류 여부, 소요 시간 |
+| `error` | 종류, 메시지, 치명 여부 |
+| `turn_finished` | 이유: 정상 종료, 횟수 초과, 반복 오류, 취소, 치명 오류 |
+
+- `tool_call_started` 는 실행 전에 기록한다. started 만 있고 finished 가 없는 호출이 중단 지점이다.
+- 대화 메시지 목록은 따로 저장하지 않고 이벤트에서 만들어 낸다.
+- `TextDelta` 는 이벤트 로그에 남기지 않는다. 완성된 응답만 `llm_response` 로 남긴다.
+- 승인(v0.2), 압축(v0.3), 계획(v0.6) 이벤트는 해당 버전에서 추가한다.
+
+### 5.7 Frontend와 Session — `interfaces/base.py`, `core/session.py`
+
+```python
+class ApprovalRequest(BaseModel):
+    tool_call_id: str
+    tool_name: str
+    actions: list[Action]
+
+
+class ApprovalDecision(StrEnum):
+    ALLOW_ONCE = "allow_once"
+    ALLOW_ALWAYS = "allow_always"
+    DENY = "deny"
+
+
+class Frontend(Protocol):  # 런타임이 인터페이스에 요구하는 것 (v0.2)
+    async def request_approval(self, request: ApprovalRequest) -> ApprovalDecision: ...
+
+
+class Session:  # 인터페이스가 호출하는 것
+    def run_turn(self, text: str) -> AsyncIterator[Event | TextDelta]: ...
+    def cancel(self) -> None: ...
+```
+
+인터페이스는 `run_turn()` 의 스트림을 받아 그리기만 한다. 런타임 로직을 인터페이스에 두지 않는다.
 
 ## 6. 오류 처리
 
@@ -157,7 +383,7 @@ MinisiusError
 
 ## 9. 미정
 
-- 이벤트 로그 스키마와 이벤트 타입 목록
+- 이벤트 로그의 SQLite 스키마, 이벤트 타입별 payload 필드
 - Compaction 전략
 - 중단 복구 시 미완료 도구 호출의 재실행 규칙
 - 스킬 자가 작성의 트리거와 검증 방법

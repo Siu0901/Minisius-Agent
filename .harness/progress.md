@@ -23,9 +23,9 @@ M0 완료. 다음은 v0.1.
 
 ## Known Issues
 
-- 핵심 인터페이스(Message, Event, Tool, Provider, ExecutionBackend, Frontend)의 타입 정의가 아직 없다. `docs/ARCHITECTURE.md` 5절이 미정이다.
+- 없음. 남은 미정 항목은 `docs/ARCHITECTURE.md` 9절과 `docs/PRD.md` 의 완료 조건에 있다.
 
 ## Next Task
 
-v0.1 을 시작하기 전에 핵심 인터페이스의 타입을 설계해 `docs/ARCHITECTURE.md` 5절을 채운다.
-그 다음 V01-F01(예외 계층)부터 `features.json` 순서대로 구현한다.
+핵심 인터페이스 타입은 `docs/ARCHITECTURE.md` 5절에 확정했다(스트리밍 포함, 이미지 제외, 도구의 Action 선언).
+`/implement-feature V01-F01`(예외 계층)부터 `features.json` 순서대로 구현한다.
