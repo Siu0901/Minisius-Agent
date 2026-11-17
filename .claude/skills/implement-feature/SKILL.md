@@ -1,7 +1,7 @@
 ---
 name: implement-feature
-description: features.json 의 기능 하나를 요구사항 확인부터 검증까지 구현한다. "다음 기능 구현해줘", "V01-F02 구현" 같은 요청에 쓴다.
-argument-hint: "[기능 ID, 예: V01-F02]"
+description: features.json 의 기능 하나를 요구사항 확인부터 검증까지 구현한다. "다음 기능 구현해줘", "V01A-F02 구현" 같은 요청에 쓴다.
+argument-hint: "[기능 ID, 예: V01A-F02]"
 ---
 
 # 기능 구현

@@ -1,5 +1,5 @@
 {
-  "_comment": "기능별 완료·검증 상태의 원본. status 는 개발 단계, passes 는 검증 통과 여부. passes 를 true 로 바꾸려면 tests 에 테스트 경로를 적고 ./scripts/verify.sh 가 통과해야 한다. 형식은 scripts/check_features.py 가 검사한다. v0.2 이후는 마일스톤을 시작할 때 세부 기능으로 쪼갠다.",
+  "_comment": "기능별 완료·검증 상태의 원본. status 는 개발 단계, passes 는 검증 통과 여부. passes 를 true 로 바꾸려면 tests 에 테스트 경로를 적고 ./scripts/verify.sh 가 통과해야 한다. 형식은 scripts/check_features.py 가 검사한다. 배열의 순서가 구현 순서다. v0.2 이후는 마일스톤을 시작할 때 세부 기능으로 쪼갠다.",
   "features": [
     {
       "id": "M0-F01",
@@ -8,12 +8,14 @@
       "spec": "docs/ROADMAP.md",
       "status": "completed",
       "passes": true,
-      "tests": ["tests/harness/test_check_architecture.py", "tests/test_smoke.py"]
+      "tests": [
+        "tests/harness/test_check_architecture.py",
+        "tests/test_smoke.py"
+      ]
     },
-
     {
-      "id": "V01-F01",
-      "milestone": "v0.1",
+      "id": "V01A-F01",
+      "milestone": "v0.1-alpha",
       "name": "예외 계층 (errors.py)",
       "spec": "docs/ARCHITECTURE.md#6",
       "status": "pending",
@@ -21,17 +23,17 @@
       "tests": []
     },
     {
-      "id": "V01-F02",
-      "milestone": "v0.1",
+      "id": "V01A-F02",
+      "milestone": "v0.1-alpha",
       "name": "내부 표준 메시지 포맷 (core/messages.py)",
-      "spec": "FR-02",
+      "spec": "docs/ARCHITECTURE.md#5.1",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F03",
-      "milestone": "v0.1",
+      "id": "V01A-F03",
+      "milestone": "v0.1-alpha",
       "name": "설정과 경로 규칙 (config.py)",
       "spec": "docs/ARCHITECTURE.md#7",
       "status": "pending",
@@ -39,89 +41,107 @@
       "tests": []
     },
     {
-      "id": "V01-F04",
-      "milestone": "v0.1",
+      "id": "V01A-F04",
+      "milestone": "v0.1-alpha",
       "name": "이벤트 타입과 append-only 이벤트 로그 (core/events.py, store/)",
-      "spec": "FR-04",
+      "spec": "FR-04, docs/ARCHITECTURE.md#5.6",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F05",
-      "milestone": "v0.1",
+      "id": "V01A-F05",
+      "milestone": "v0.1-alpha",
       "name": "Provider 인터페이스와 모델 메타데이터 (providers/base.py, models.py)",
+      "spec": "FR-02, docs/ARCHITECTURE.md#5.2",
+      "status": "pending",
+      "passes": false,
+      "tests": []
+    },
+    {
+      "id": "V01A-F06",
+      "milestone": "v0.1-alpha",
+      "name": "AnthropicAdapter (스트리밍, 도구 호출, thinking 블록 보존)",
       "spec": "FR-02",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F06",
-      "milestone": "v0.1",
-      "name": "AnthropicAdapter",
-      "spec": "FR-02",
-      "status": "pending",
-      "passes": false,
-      "tests": []
-    },
-    {
-      "id": "V01-F07",
-      "milestone": "v0.1",
-      "name": "GeminiAdapter",
-      "spec": "FR-02",
-      "status": "pending",
-      "passes": false,
-      "tests": []
-    },
-    {
-      "id": "V01-F08",
-      "milestone": "v0.1",
-      "name": "OpenAICompatibleAdapter (openrouter, ollama)",
-      "spec": "FR-02",
-      "status": "pending",
-      "passes": false,
-      "tests": []
-    },
-    {
-      "id": "V01-F09",
-      "milestone": "v0.1",
+      "id": "V01A-F07",
+      "milestone": "v0.1-alpha",
       "name": "ExecutionBackend 인터페이스와 local 백엔드",
+      "spec": "FR-03, docs/ARCHITECTURE.md#5.5",
+      "status": "pending",
+      "passes": false,
+      "tests": []
+    },
+    {
+      "id": "V01A-F08",
+      "milestone": "v0.1-alpha",
+      "name": "Tool 인터페이스와 Registry (인수 검증, Action 선언, 오류를 도구 결과로 변환)",
+      "spec": "FR-03, docs/ARCHITECTURE.md#5.3",
+      "status": "pending",
+      "passes": false,
+      "tests": []
+    },
+    {
+      "id": "V01A-F09",
+      "milestone": "v0.1-alpha",
+      "name": "파일 읽기 도구 (탐색, 읽기, 검색)",
       "spec": "FR-03",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F10",
-      "milestone": "v0.1",
-      "name": "Tool 인터페이스와 Registry (인수 검증, 오류를 도구 결과로 변환)",
-      "spec": "FR-03",
+      "id": "V01A-F10",
+      "milestone": "v0.1-alpha",
+      "name": "Agent Loop (연속 도구 호출, 횟수 제한, 재시도, 반복 오류 차단)",
+      "spec": "FR-01, docs/ARCHITECTURE.md#5.4",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F11",
-      "milestone": "v0.1",
-      "name": "파일 도구 (탐색, 읽기, 검색, 수정, 생성)",
-      "spec": "FR-03",
+      "id": "V01A-F11",
+      "milestone": "v0.1-alpha",
+      "name": "CLI 대화 (minisius)",
+      "spec": "FR-05",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F12",
-      "milestone": "v0.1",
-      "name": "셸 도구",
-      "spec": "FR-03",
+      "id": "V01B-F01",
+      "milestone": "v0.1-beta",
+      "name": "최소 권한 정책과 CLI 승인 (민감 경로 차단, 실제 경로 판정, 승인 프롬프트)",
+      "spec": "FR-07",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F13",
-      "milestone": "v0.1",
+      "id": "V01B-F02",
+      "milestone": "v0.1-beta",
+      "name": "파일 수정·생성 도구",
+      "spec": "FR-03, FR-07",
+      "status": "pending",
+      "passes": false,
+      "tests": []
+    },
+    {
+      "id": "V01B-F03",
+      "milestone": "v0.1-beta",
+      "name": "셸 도구 (타임아웃, 출력 크기 제한)",
+      "spec": "FR-03, FR-07",
+      "status": "pending",
+      "passes": false,
+      "tests": []
+    },
+    {
+      "id": "V01B-F04",
+      "milestone": "v0.1-beta",
       "name": "웹 도구 (검색, 페이지 가져오기)",
       "spec": "FR-03",
       "status": "pending",
@@ -129,28 +149,27 @@
       "tests": []
     },
     {
-      "id": "V01-F14",
-      "milestone": "v0.1",
-      "name": "Agent Loop (연속 도구 호출, 횟수 제한, 재시도, 반복 오류 차단)",
-      "spec": "FR-01",
+      "id": "V01B-F05",
+      "milestone": "v0.1-beta",
+      "name": "GeminiAdapter",
+      "spec": "FR-02",
       "status": "pending",
       "passes": false,
       "tests": []
     },
     {
-      "id": "V01-F15",
-      "milestone": "v0.1",
-      "name": "CLI 대화 (minisius)",
-      "spec": "FR-05",
+      "id": "V01B-F06",
+      "milestone": "v0.1-beta",
+      "name": "OpenAICompatibleAdapter (openai, openrouter, ollama)",
+      "spec": "FR-02",
       "status": "pending",
       "passes": false,
       "tests": []
     },
-
     {
       "id": "V02-F00",
       "milestone": "v0.2",
-      "name": "Discord 게이트웨이, setup 온보딩, 서비스 등록, 권한·승인 (세부 기능 미정)",
+      "name": "Discord 게이트웨이와 승인 버튼, setup 온보딩, 서비스 등록, \"항상 허용\" 목록, 정책 설정 (세부 기능 미정)",
       "spec": "FR-06, FR-07, FR-08",
       "status": "pending",
       "passes": false,

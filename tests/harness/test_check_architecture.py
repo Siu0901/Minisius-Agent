@@ -41,7 +41,7 @@ def test_clean_tree_has_no_violations(tmp_path: Path) -> None:
 def test_sdk_outside_adapter_is_flagged(tmp_path: Path) -> None:
     root = tmp_path / "minisius"
     _write(root, "core/loop.py", "from anthropic import Anthropic\n")
-    assert _rule_ids(root) == ["A2"]
+    assert _rule_ids(root) == ["A2-ANTHROPIC"]
 
 
 def test_core_importing_adapter_or_interface_is_flagged(tmp_path: Path) -> None:

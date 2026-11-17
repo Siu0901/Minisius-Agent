@@ -33,7 +33,7 @@ src/minisius/
 │   ├── base.py            # Provider 인터페이스
 │   ├── anthropic_adapter.py
 │   ├── gemini_adapter.py
-│   ├── openai_compat_adapter.py   # openrouter, ollama 공용
+│   ├── openai_compat_adapter.py   # openai, openrouter, ollama 공용
 │   └── models.py          # 모델 메타데이터 표
 ├── tools/
 │   ├── base.py            # Tool 인터페이스
@@ -44,7 +44,7 @@ src/minisius/
 │   ├── base.py            # ExecutionBackend 인터페이스
 │   ├── local.py
 │   └── docker.py          # v0.7
-├── policy/                # v0.2
+├── policy/                # v0.1-beta
 │   ├── engine.py          # 허용·승인 필요·차단 판정
 │   └── rules.py           # 경로 범위, 민감 경로, 명령 분류
 ├── store/
@@ -72,7 +72,9 @@ src/minisius/
 | ID | 규칙 |
 |---|---|
 | A1 | 에이전트 프레임워크(LangChain, LangGraph, LlamaIndex, CrewAI, AutoGen 등)를 import 하지 않는다 |
-| A2 | 프로바이더 SDK(`anthropic`, `google.genai`, `openai`)는 각자의 어댑터 파일에서만 import 한다 |
+| A2-ANTHROPIC | `anthropic` SDK 는 `providers/anthropic_adapter.py` 에서만 import 한다 |
+| A2-GEMINI | `google.genai` SDK 는 `providers/gemini_adapter.py` 에서만 import 한다 |
+| A2-OPENAI | `openai` SDK 는 `providers/openai_compat_adapter.py` 에서만 import 한다 |
 | A3 | `interfaces` 는 최상위 계층이다. `interfaces` 와 `__main__` 외에는 `interfaces` 를 import 하지 않는다 |
 | A4 | `core` 는 `providers.base` 와 `providers.models` 만 import 한다. 특정 어댑터를 모른다 |
 | A5 | `tools` 는 프로세스를 직접 띄우지 않는다(`subprocess` 등 금지). `execution` 백엔드를 거친다 |
@@ -84,8 +86,8 @@ src/minisius/
 
 ## 4. LLM Provider
 
-- 프로바이더 4개(`anthropic`, `gemini`, `openrouter`, `ollama`), 어댑터 3개.
-  OpenRouter와 Ollama는 `OpenAICompatibleAdapter` 를 같이 쓰고 `base_url` 기본값과 API 키 필수 여부만 다르다.
+- 프로바이더 5개(`anthropic`, `gemini`, `openai`, `openrouter`, `ollama`), 어댑터 3개.
+  OpenAI, OpenRouter, Ollama는 `OpenAICompatibleAdapter` 를 같이 쓰고 `base_url` 기본값과 API 키 필수 여부만 다르다.
 - 내부 표준 메시지 포맷을 직접 정의하고 어댑터가 양방향으로 변환한다.
 - 프로바이더 원본(thinking 블록, thought signature 등)은 불투명 필드에 보존해 그대로 되돌려 보낸다.
 - 모델 메타데이터 표에 컨텍스트 크기, 토큰 단가, 도구 호출 지원 여부를 둔다.
@@ -240,7 +242,8 @@ LLM 은 도구를 호출하겠다고 응답하고 결과를 받을 뿐이다. �
 2. Agent Loop 가 Registry 로 인수를 검증한다. 실패하면 오류를 도구 결과로 돌려준다.
 3. Agent Loop 가 도구의 `actions(args)` 를 부른다.
 4. `tool_call_started` 이벤트를 기록한다.
-5. Agent Loop 가 Action 을 `policy` 에 넘긴다. 판정은 허용, 승인 필요, 차단 중 하나다(v0.2. v0.1 은 전부 허용).
+5. Agent Loop 가 Action 을 `policy` 에 넘긴다. 판정은 허용, 승인 필요, 차단 중 하나다.
+   v0.1-alpha 에는 읽기 전용 도구만 있고, 쓰기·셸 도구는 정책과 함께 v0.1-beta 에 들어온다.
    승인 필요면 `Frontend.request_approval()` 로 사용자에게 묻는다.
 6. 허용 또는 승인이면 `run()` 을 부른다. 거절 또는 차단이면 `PermissionDenied` 를 도구 결과로 만든다.
 7. `tool_call_finished` 이벤트를 기록하고 결과를 LLM 에 돌려준다.
@@ -293,7 +296,7 @@ class Event(BaseModel):
 - `tool_call_started` 는 실행 전에 기록한다. started 만 있고 finished 가 없는 호출이 중단 지점이다.
 - 대화 메시지 목록은 따로 저장하지 않고 이벤트에서 만들어 낸다.
 - `TextDelta` 는 이벤트 로그에 남기지 않는다. 완성된 응답만 `llm_response` 로 남긴다.
-- 승인(v0.2), 압축(v0.3), 계획(v0.6) 이벤트는 해당 버전에서 추가한다.
+- 승인(v0.1-beta), 압축(v0.3), 계획(v0.6) 이벤트는 해당 버전에서 추가한다.
 
 ### 5.7 Frontend와 Session — `interfaces/base.py`, `core/session.py`
 
@@ -310,7 +313,7 @@ class ApprovalDecision(StrEnum):
     DENY = "deny"
 
 
-class Frontend(Protocol):  # 런타임이 인터페이스에 요구하는 것 (v0.2)
+class Frontend(Protocol):  # 런타임이 인터페이스에 요구하는 것 (v0.1-beta)
     async def request_approval(self, request: ApprovalRequest) -> ApprovalDecision: ...
 
 
@@ -320,6 +323,19 @@ class Session:  # 인터페이스가 호출하는 것
 ```
 
 인터페이스는 `run_turn()` 의 스트림을 받아 그리기만 한다. 런타임 로직을 인터페이스에 두지 않는다.
+
+### 5.8 중단된 도구 호출
+
+프로세스가 죽은 뒤 이벤트 로그를 읽으면 도구 호출은 셋 중 하나다.
+
+| 로그의 상태 | 의미 | 처리 |
+|---|---|---|
+| `tool_call_started` 없음 | 실행하지 않았다 | 다시 실행해도 된다 |
+| started 와 finished 둘 다 있음 | 끝났다 | 다시 실행하지 않는다 |
+| started 만 있음 | **결과를 모른다.** 실행 전에 죽었을 수도, 실행은 끝났는데 기록 전에 죽었을 수도 있다 | 자동으로 다시 실행하지 않는다 |
+
+started 만 있는 호출은 "안 했다"가 아니라 "모른다"로 다룬다. 기본 정책은 자동 재실행 금지다.
+현재 상태를 확인하거나 사용자에게 묻는 구체적인 복구 방법은 v0.6 에서 정한다.
 
 ## 6. 오류 처리
 
@@ -385,5 +401,5 @@ MinisiusError
 
 - 이벤트 로그의 SQLite 스키마, 이벤트 타입별 payload 필드
 - Compaction 전략
-- 중단 복구 시 미완료 도구 호출의 재실행 규칙
+- 결과가 불확실한 도구 호출을 복구하는 구체적인 방법 (기본 정책은 5.8절)
 - 스킬 자가 작성의 트리거와 검증 방법
