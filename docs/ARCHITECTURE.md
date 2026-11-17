@@ -386,7 +386,7 @@ MinisiusError
 ```
 ~/.minisius/
 ├── config.toml        # 프로바이더, 모델, 작업 폴더, 권한 정책
-├── secrets.toml       # API 키, Discord 토큰 (권한 600)
+├── .env               # API 키, Discord 토큰 (권한 600)
 ├── minisius.db        # 이벤트 로그, 세션, 예약 작업, FTS
 ├── memory/USER.md, MEMORY.md
 ├── skills/<스킬명>/SKILL.md
@@ -394,6 +394,29 @@ MinisiusError
 ```
 
 기본 권한 정책은 [PRD.md](PRD.md) FR-07 이 원본이다. 실행 환경은 `local`(기본) 또는 `docker`.
+
+### 설정 읽기 — `config.py`
+
+- 데이터 폴더는 환경 변수 `MINISIUS_HOME`, 없으면 `~/.minisius/` 다.
+- 설정은 `config.toml`, 비밀 값은 `.env` 에 둔다. 설정은 타입과 목록이 필요해서 TOML 이고, 비밀 값은 이름과 값의 나열이라 `.env` 다.
+- 같은 이름의 환경 변수가 있으면 `.env` 보다 우선한다.
+- API 키 이름: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`. `ollama` 는 키가 없다.
+- `.env` 를 다른 사용자가 읽을 수 있으면 경고한다. 시작은 막지 않는다.
+- 모르는 항목은 거절한다. 문제가 있으면 어느 파일의 어느 항목인지 적은 `ConfigError` 를 던진다. 오류 메시지에 입력 값은 넣지 않는다.
+- 새 섹션은 그 기능을 만들 때 추가한다.
+
+```toml
+[llm]
+provider = "anthropic"   # 필수
+model = "..."              # 필수. 기본값을 두지 않는다
+max_tokens = 8192
+
+[agent]
+max_iterations = 50
+
+[execution]
+backend = "local"
+```
 
 ## 8. 프로세스와 명령어
 
