@@ -138,7 +138,17 @@ class Message(BaseModel):
 - 시스템 프롬프트는 메시지가 아니라 `LLMRequest.system` 이다.
 - 도구 결과는 `role="tool"` 메시지로 통일한다. 프로바이더별 위치 차이는 어댑터가 처리한다.
 - 불투명 데이터(`OpaquePart`, `provider_data`)는 같은 프로바이더에게만 되돌려 보낸다. 세션 중간에 프로바이더가 바뀌면 버린다.
-- 이미지 입력은 없다. 필요해지면 `Part` 에 `ImagePart` 를 추가한다.
+- 이미지 입력은 없다. 나중에 넣을 예정이며, 그때 `Part` 에 `ImagePart` 를 추가하고 아래 역할 표를 고친다.
+- 모든 모델은 불변(`frozen`)이고 정의에 없는 필드를 거절한다(`extra="forbid"`). 메시지는 이벤트 로그에 남는 기록이다.
+- 역할마다 넣을 수 있는 파트가 정해져 있고, 어기면 생성할 때 오류다.
+
+  | 역할 | 허용하는 파트 | 빈 메시지 |
+  |---|---|---|
+  | `user` | `TextPart` | 불가 |
+  | `assistant` | `TextPart`, `ToolCallPart`, `OpaquePart` | 허용 (모델이 내용 없이 끝내는 경우) |
+  | `tool` | `ToolResultPart` | 불가 |
+
+- 편의 기능: `Message.user(text)`, `Message.tool_results(results)`, `.text`(텍스트 파트만 이어 붙임), `.tool_calls`(순서 유지).
 
 ### 5.2 Provider — `providers/base.py`
 

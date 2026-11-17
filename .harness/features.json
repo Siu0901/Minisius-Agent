@@ -29,9 +29,11 @@
       "milestone": "v0.1-alpha",
       "name": "내부 표준 메시지 포맷 (core/messages.py)",
       "spec": "docs/ARCHITECTURE.md#5.1",
-      "status": "pending",
-      "passes": false,
-      "tests": []
+      "status": "completed",
+      "passes": true,
+      "tests": [
+        "tests/core/test_messages.py"
+      ]
     },
     {
       "id": "V01A-F03",
