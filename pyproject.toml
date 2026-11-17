@@ -4,7 +4,9 @@ version = "0.0.0"
 description = "CLI와 Discord로 말을 거는 설치형 범용 AI 에이전트 (미니 Hermes)"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.14.3",
+]
 
 [dependency-groups]
 dev = [
@@ -39,3 +41,4 @@ select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
 python_version = "3.12"
 strict = true
 files = ["src"]
+plugins = ["pydantic.mypy"]

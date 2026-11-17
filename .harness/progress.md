@@ -7,20 +7,22 @@
 
 ## Current Milestone
 
-v0.1-alpha (1/11 완료)
+v0.1-alpha (2/11 완료)
 
 ## Completed
 
 - M0-F01 개발 하네스
 - V01A-F01 예외 계층 (`src/minisius/errors.py`). 아키텍처 검사기에 A7(예외 클래스는 errors.py 에만) 추가
+- V01A-F02 내부 표준 메시지 포맷 (`src/minisius/core/messages.py`). 브랜치 `feat/v01a-f02-messages`
 
 ## Current Work
 
-없음.
+V01A-F02 는 구현과 검증이 끝났고 브랜치 `feat/v01a-f02-messages` 에서 사용자의 점검을 기다린다.
+사용자가 커밋·푸시한 뒤 `main` 대상 PR 을 만든다.
 
 ## Test Results
 
-- `./scripts/verify.sh`: PASS (2026-11-17, 테스트 22개)
+- `./scripts/verify.sh`: PASS (2026-11-17, 테스트 46개)
 
 ## Known Issues
 
@@ -28,7 +30,8 @@ v0.1-alpha (1/11 완료)
 
 ## Next Task
 
-`/implement-feature V01A-F02`(내부 표준 메시지 포맷, `core/messages.py`). 타입은 `docs/ARCHITECTURE.md` 5.1절에 확정돼 있다.
+`/implement-feature V01A-F03`(설정과 경로 규칙, `config.py`). 새 브랜치에서 시작한다.
+설정 파일의 항목과 형식은 아직 정해지지 않았다. 구현 전에 사용자와 정한다(`docs/ARCHITECTURE.md` 7절).
 
 v0.1 은 alpha 와 beta 로 나뉜다(ADR-019). alpha 는 Anthropic 어댑터와 읽기 전용 도구만으로
 Agent Loop 를 실제로 돌리는 데까지다. 쓰기·셸 도구는 권한 정책과 함께 beta 에 들어온다(ADR-018).
