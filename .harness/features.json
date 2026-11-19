@@ -51,9 +51,13 @@
       "milestone": "v0.1-alpha",
       "name": "이벤트 타입과 append-only 이벤트 로그 (core/events.py, store/)",
       "spec": "FR-04, docs/ARCHITECTURE.md#5.6",
-      "status": "pending",
-      "passes": false,
-      "tests": []
+      "status": "completed",
+      "passes": true,
+      "tests": [
+        "tests/core/test_actions.py",
+        "tests/core/test_events.py",
+        "tests/store/test_event_log.py"
+      ]
     },
     {
       "id": "V01A-F05",

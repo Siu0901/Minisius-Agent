@@ -24,7 +24,8 @@ src/minisius/
 ├── errors.py              # 예외 계층 전체
 ├── core/                  # 런타임
 │   ├── messages.py        # 내부 표준 메시지 포맷
-│   ├── events.py          # 이벤트 타입
+│   ├── actions.py         # 도구가 선언하는 Action
+│   ├── events.py          # 이벤트 타입, 이벤트에서 대화·사용량 만들기
 │   ├── loop.py            # Agent Loop
 │   ├── session.py         # 세션 조립·수명·재개
 │   ├── context.py         # 프롬프트 조립, Compaction (v0.3)
@@ -203,7 +204,9 @@ class Provider(Protocol):
 `providers/models.py` 의 `ModelInfo`: `context_window`, `max_output_tokens`, `supports_tools`, 입력·출력 토큰 단가.
 표에 없는 모델(Ollama, OpenRouter 의 임의 모델)은 설정 파일에서 값을 받는다.
 
-### 5.3 Tool — `tools/base.py`
+### 5.3 Tool — `core/actions.py`, `tools/base.py`
+
+`Action` 은 도구, 정책, 이벤트 로그가 모두 쓰므로 `core/actions.py` 에 둔다. 나머지는 `tools/base.py` 다.
 
 ```python
 class ActionKind(StrEnum):
@@ -250,7 +253,7 @@ class Tool[ArgsT: BaseModel](ABC):
 LLM 은 도구를 호출하겠다고 응답하고 결과를 받을 뿐이다. 그 사이의 검사는 전부 Agent Loop 가 한다.
 
 1. LLM 응답에 `ToolCallPart` 가 있다.
-2. Agent Loop 가 Registry 로 인수를 검증한다. 실패하면 오류를 도구 결과로 돌려준다.
+2. Agent Loop 가 Registry 로 인수를 검증한다. 실패하면 오류를 `tool_call_finished` 로 기록하고 도구 결과로 돌려준다. 이때는 `tool_call_started` 가 없다.
 3. Agent Loop 가 도구의 `actions(args)` 를 부른다.
 4. `tool_call_started` 이벤트를 기록한다.
 5. Agent Loop 가 Action 을 `policy` 에 넘긴다. 판정은 허용, 승인 필요, 차단 중 하나다.
@@ -282,32 +285,70 @@ class ExecutionBackend(Protocol):
 - 백엔드는 권한을 모른다. 가장 아래 계층이다.
 - `DirEntry`, `FileStat` 의 필드: 미정 (V01-F09 에서 정한다).
 
-### 5.6 Event — `core/events.py`
+### 5.6 Event — `core/events.py`, `store/`
 
 ```python
 class Event(BaseModel):
     session_id: str
-    seq: int  # 세션 안에서 1부터 증가
-    ts: datetime
-    type: str
-    payload: dict[str, Any]  # type 별 Pydantic 모델로 검증한다
+    seq: int  # 세션 안에서 1부터 증가. 이벤트 로그가 매긴다
+    ts: datetime  # UTC. 이벤트 로그가 매긴다
+    payload: EventPayload  # 아래 모델 중 하나. `type` 필드로 구분한다
+
+    @property
+    def type(self) -> str: ...
 ```
 
-| 타입 | 내용 |
-|---|---|
-| `session_started` | 작업 폴더, 프로바이더, 모델, 인터페이스 |
-| `user_message` | 사용자 메시지 |
-| `llm_request` | 모델, 컨텍스트에 포함한 이벤트 범위 |
-| `llm_response` | 응답 메시지, 종료 이유, 토큰, 비용, 소요 시간 |
-| `tool_call_started` | 호출 ID, 도구 이름, 인수, 선언한 Action |
-| `tool_call_finished` | 호출 ID, 결과, 오류 여부, 소요 시간 |
-| `error` | 종류, 메시지, 치명 여부 |
-| `turn_finished` | 이유: 정상 종료, 횟수 초과, 반복 오류, 취소, 치명 오류 |
+| 타입 | 모델 | 필드 |
+|---|---|---|
+| `session_started` | `SessionStarted` | `workdir`, `provider`, `model`, `interface` |
+| `user_message` | `UserMessage` | `message` |
+| `llm_request` | `LLMRequested` | `model`, `message_count` |
+| `llm_response` | `LLMResponded` | `message`, `stop_reason`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_write_tokens`, `cost_usd`, `duration_ms` |
+| `tool_call_started` | `ToolCallStarted` | `tool_call_id`, `name`, `arguments`, `actions` |
+| `tool_call_finished` | `ToolCallFinished` | `tool_call_id`, `content`, `is_error`, `duration_ms` |
+| `error` | `ErrorOccurred` | `kind`(예외 클래스 이름), `message`, `fatal` |
+| `turn_finished` | `TurnFinished` | `reason`: `completed`, `max_iterations`, `repeated_error`, `cancelled`, `fatal_error` |
 
 - `tool_call_started` 는 실행 전에 기록한다. started 만 있고 finished 가 없는 호출이 중단 지점이다.
-- 대화 메시지 목록은 따로 저장하지 않고 이벤트에서 만들어 낸다.
+- `llm_request` 는 요청을 보내기 직전에 기록한다. 보낸 메시지 자체는 앞선 이벤트에 있으므로 개수만 남긴다.
+- `cost_usd` 는 단가를 모르는 모델이면 `None` 이다.
 - `TextDelta` 는 이벤트 로그에 남기지 않는다. 완성된 응답만 `llm_response` 로 남긴다.
 - 승인(v0.1-beta), 압축(v0.3), 계획(v0.6) 이벤트는 해당 버전에서 추가한다.
+
+이벤트에서 만들어 내는 것 (`core/events.py`):
+
+- `messages_from_events(events) -> list[Message]`: 대화. `user_message`, `llm_response`, `tool_call_finished` 에서 만든다. 잇달아 끝난 도구 호출의 결과는 tool 메시지 하나로 묶는다.
+- `usage_from_events(events) -> Usage`: 호출 수, 토큰, 비용의 합계. 단가를 몰라 비용에 들어가지 않은 호출 수(`unpriced_calls`)를 따로 센다.
+- 대화 메시지 목록은 따로 저장하지 않는다. 그래서 LLM 에 돌려준 도구 결과는 인수 검증 실패처럼 실행 없이 끝난 것까지 모두 `tool_call_finished` 로 남겨야 한다.
+
+저장 (`store/db.py`, `store/event_log.py`):
+
+```sql
+CREATE TABLE events (
+    session_id TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    ts TEXT NOT NULL,       -- ISO 8601, UTC
+    type TEXT NOT NULL,
+    payload TEXT NOT NULL,  -- type 을 뺀 payload 의 JSON
+    PRIMARY KEY (session_id, seq)
+);
+```
+
+```python
+class EventLog:
+    @classmethod
+    async def open(cls, db_file: Path) -> Self: ...
+    async def append(self, session_id: str, payload: EventPayload) -> Event: ...
+    async def read(self, session_id: str) -> list[Event]: ...
+    async def close(self) -> None: ...
+```
+
+- 쓰기는 `append()` 하나다. 고치거나 지우는 기능은 없고, DB 트리거가 `UPDATE`, `DELETE`, 같은 번호를 덮어쓰는 `INSERT OR REPLACE` 를 거절한다.
+- `append()` 는 쓰기 잠금을 잡은 뒤 번호와 시각을 매긴다. 두 프로세스가 같은 세션에 써도 번호가 겹치지 않는다.
+- `append()` 가 돌아오면 커밋된 것이다(WAL, `synchronous=FULL`). macOS 는 `fullfsync` 를 켜지 않으면 드라이브 캐시까지는 내리지 않으므로, 전원이 나갈 때의 보장은 OS 의 `fsync` 만큼이다.
+- 스키마 버전은 `PRAGMA user_version` 에 둔다. `db.MIGRATIONS` 에 순서대로 더한다. DB 가 프로그램보다 새 버전이면 열지 않는다.
+- SQLite 오류, 저장할 수 없는 값, 해석할 수 없는 이벤트는 `StoreError` 로 바꿔 던진다.
+- 표준 라이브러리 `sqlite3` 를 작업 스레드에서 쓴다.
 
 ### 5.7 Frontend와 Session — `interfaces/base.py`, `core/session.py`
 
@@ -343,6 +384,7 @@ class Session:  # 인터페이스가 호출하는 것
 |---|---|---|
 | `tool_call_started` 없음 | 실행하지 않았다 | 다시 실행해도 된다 |
 | started 와 finished 둘 다 있음 | 끝났다 | 다시 실행하지 않는다 |
+| finished 만 있음 | 인수 검증에 실패해 실행하지 않았고, 오류를 이미 LLM 에 돌려줬다 | 다시 실행하지 않는다 |
 | started 만 있음 | **결과를 모른다.** 실행 전에 죽었을 수도, 실행은 끝났는데 기록 전에 죽었을 수도 있다 | 자동으로 다시 실행하지 않는다 |
 
 started 만 있는 호출은 "안 했다"가 아니라 "모른다"로 다룬다. 기본 정책은 자동 재실행 금지다.
@@ -433,7 +475,7 @@ backend = "local"
 
 ## 9. 미정
 
-- 이벤트 로그의 SQLite 스키마, 이벤트 타입별 payload 필드
+- 이벤트 로그에 남는 비밀 값. 도구 인수와 도구 결과를 걸러내지 않고 기록하므로, LLM 이 인수에 넣은 비밀 값이나 도구가 읽어 온 비밀 값이 DB 에 남는다. 가릴지, 어떻게 가릴지는 정하지 않았다
 - Compaction 전략
 - 결과가 불확실한 도구 호출을 복구하는 구체적인 방법 (기본 정책은 5.8절)
 - 스킬 자가 작성의 트리거와 검증 방법

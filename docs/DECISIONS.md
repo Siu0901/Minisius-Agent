@@ -143,3 +143,18 @@
 - 대안: 처음 안은 `secrets.toml` 이었다. 전부 `.env` 로 하는 안은 권한 정책 같은 구조 있는 설정을 담기 어렵다.
 - 권한을 경고로 둔 이유: 직접 파일을 만드는 단계에서는 매번 막히면 번거롭다. v0.2 의 `setup` 이 파일을 600 으로 만든다.
 - 의존성: `python-dotenv` 를 추가했다. TOML 은 표준 라이브러리로 읽는다.
+
+## ADR-023: Action 타입은 core 에 둔다
+
+- 결정: `Action`, `ActionKind` 를 `tools/base.py` 가 아니라 `core/actions.py` 에 둔다.
+- 이유: 도구(선언), 정책(판정), 이벤트 로그(기록), 인터페이스(승인 화면)가 모두 쓴다. `tools` 에 두면 `core/events.py` 가 `tools` 를 import 해야 하고, 이벤트 타입이 도구 계층에 묶인다.
+- 보완하는 결정: ADR-016.
+
+## ADR-024: 이벤트 로그는 표 하나, 표준 라이브러리 sqlite3
+
+- 결정: 이벤트는 `events` 표 하나에 `(session_id, seq)` 를 키로 쌓고 payload 는 JSON 으로 둔다. `UPDATE`, `DELETE`, 같은 번호를 덮어쓰는 `INSERT` 는 DB 트리거로 거절한다. `sqlite3` 를 작업 스레드에서 호출하고 `aiosqlite` 는 추가하지 않는다.
+- 이유: 이벤트 타입이 늘어도 스키마를 바꾸지 않는다. 추가만 가능하다는 규칙을 코드의 약속이 아니라 DB 가 강제한다. `aiosqlite` 가 하는 일도 스레드에서 `sqlite3` 를 부르는 것이라 의존성을 늘릴 이유가 없다.
+- 번호: `append()` 가 `BEGIN IMMEDIATE` 로 쓰기 잠금을 잡은 뒤 `MAX(seq) + 1` 을 매긴다. CLI 와 게이트웨이가 같은 DB 를 써도 겹치지 않는다.
+- 단점: payload 안의 값으로 검색하려면 JSON 함수를 써야 한다. 세션 검색(v0.4)은 FTS 표를 따로 둔다.
+- 한계: 도구 인수와 결과를 걸러내지 않고 기록한다. 비밀 값이 들어가면 DB 에 남는다(`docs/ARCHITECTURE.md` 9절).
+
